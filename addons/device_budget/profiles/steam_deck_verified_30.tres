@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="BudgetProfile" format=3]
+
+[ext_resource type="Script" path="res://addons/device_budget/budget_profile.gd" id="1_budget"]
+[ext_resource type="Resource" path="res://addons/device_budget/profiles/steam_deck.tres" id="2_device"]
+
+[resource]
+script = ExtResource("1_budget")
+label = "Steam Deck Verified floor, 30 fps"
+resolution = Vector2i(1280, 800)
+window_s = 20.0
+warm_frames = 180
+min_frames = 300
+min_drawn = 0.95
+frame_mean_ms = 33.3
+frame_p99_ms = 49.9
+gpu_mean_ms = 21.9
+gpu_p99_ms = 49.9
+cpu_tick_ms = 8.0
+hitch_ms = 66.6
+hitch_max = 3
+video_max_mb = 1024.0
+static_max_mb = 4096.0
+device = ExtResource("2_device")

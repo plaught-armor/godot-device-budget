@@ -1,0 +1,7 @@
+; A host project for the device_budget addon, so a clone runs its example as is.
+
+config_version=5
+
+[application]
+
+config/name="device_budget"
