@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Proves run_suite.sh on a fake Godot, in seconds and with no window: the GPU pick, the board, the
-# monitor check, pass and fail per scene, timeouts, stale reports and the merged JUnit.
+# Proves run_suite.sh on a fake Godot, in seconds and with no window: the GPU pick, the board name
+# and its fallback order, the monitor check, pass and fail per scene, timeouts, stale reports and
+# the merged JUnit.
 #
 #   addons/device_budget/checks/run_suite_check.sh [run_suite.sh copy]
 #
@@ -27,10 +28,20 @@ r=E.parse(sys.argv[1]).getroot()
 assert r.tag==\"testsuites\" and r.get(\"tests\")==\"7\" and r.get(\"failures\")==\"4\", r.attrib
 assert len(r)==5
 " "$W/logs/suite.junit.xml"'
-board="$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null || echo unknown)"
+# Board: a copy reading a fake DMI file and device-tree model.
+mkdir -p "$W/dmi" "$W/dt"
+sed -e "s#/sys/devices/virtual/dmi/id#$W/dmi#g" -e "s#/proc/device-tree#$W/dt#g" "$R" >"$W/board.sh"
+printf 'Pi 5\0' >"$W/dt/model"; echo " Jupiter " >"$W/dmi/product_name"
+out="$(GPU_INDEX=1 bash "$W/board.sh" res://good.tscn 2>&1)"
+check "board: DMI first, edges dropped" 'grep -q "^run_suite: board=Jupiter on_device=1 " <<<"$out"'
+: >"$W/dmi/product_name"
 : >"$W/args"
-DEVICE_BOARDS="Nope $board" bash "$R" res://good.tscn >/dev/null 2>&1
-check "on the device: no gpu index" '! grep -q -- "--gpu-index" "$W/args"'
+out="$(DEVICE_BOARDS="Nope,Pi 5" GPU_INDEX=1 bash "$W/board.sh" res://good.tscn 2>&1)"
+check "board: empty DMI falls to device tree, NUL dropped" 'grep -q "^run_suite: board=Pi 5 " <<<"$out" && ! grep -q "null byte" <<<"$out"'
+check "on the device: no gpu index" 'grep -q " on_device=1 " <<<"$out" && ! grep -q -- "--gpu-index" "$W/args"'
+rm "$W/dmi/product_name" "$W/dt/model"
+out="$(GPU_INDEX=1 bash "$W/board.sh" res://good.tscn 2>&1)"
+check "board: neither file, unknown" 'grep -q "^run_suite: board=unknown on_device=0 " <<<"$out"'
 GPU_INDEX=0 bash "$R" res://good.tscn >/dev/null 2>&1
 check "GPU_INDEX overrides" 'grep -q -- "--gpu-index 0 " "$W/args"'
 # Monitors: a copy reading a fake DRM tree, with no tool to wake it.

@@ -2,24 +2,28 @@ class_name BudgetReport
 extends RefCounted
 
 ## The machine-readable report writers: JSON sections and JUnit XML, from a run's checks and bars.
-## Pure but for `env`, which reads the host. Never instantiated.
+## Pure but for `env` and `board`, which read the host. Never instantiated.
 ## WHY: addons/device_budget/README.md §6
 
-const BOARD_PATH: String = "/sys/devices/virtual/dmi/id/product_name"
+## Files that name the board, in the order read: the DMI product name on a PC, the device-tree model
+## on an ARM board. run_suite.sh reads the same two.
+const BOARD_FILES: Array[String] = [
+	"/sys/devices/virtual/dmi/id/product_name",
+	"/proc/device-tree/model",
+]
+## What OS.get_model_name returns on a platform that does not know the model.
+const GENERIC_MODEL: String = "GenericDevice"
 
 
 ## What the run's numbers depend on beyond the scene: engine build, host, GPU, pool, window (px).
 static func env(window: Vector2i) -> Dictionary:
-	var board: String = ""
-	if FileAccess.file_exists(BOARD_PATH):
-		board = FileAccess.get_file_as_string(BOARD_PATH).strip_edges()
 	return {
 		"engine": Engine.get_version_info()["string"],
 		"debug": OS.is_debug_build(),
 		"editor": OS.has_feature("editor"),
 		"binary": OS.get_executable_path(),
 		"os": OS.get_name(),
-		"board": board,
+		"board": board(OS.get_model_name(), BOARD_FILES),
 		"cpu": OS.get_processor_name(),
 		"threads": OS.get_processor_count(),
 		"pool": ProjectSettings.get_setting("threading/worker_pool/max_threads"),
@@ -31,6 +35,21 @@ static func env(window: Vector2i) -> Dictionary:
 		"window": [window.x, window.y],
 		"pin": OS.get_environment("DEVICE_BUDGET_PIN"),
 	}
+
+
+## The device's board name: `model` unless it is empty or GENERIC_MODEL, else the first of `files`
+## that exists and holds a name, its trailing NUL and edge whitespace dropped; "" when none does.
+## Reads `files`.
+static func board(model: String, files: Array[String]) -> String:
+	if not model.is_empty() and model != GENERIC_MODEL:
+		return model
+	for path: String in files:
+		if not FileAccess.file_exists(path):
+			continue
+		var name: String = FileAccess.get_file_as_bytes(path).get_string_from_utf8().strip_edges()
+		if not name.is_empty():
+			return name
+	return ""
 
 
 ## `profile`'s budgets as a JSON object.

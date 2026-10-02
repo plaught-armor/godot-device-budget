@@ -129,8 +129,8 @@ stops at a window that was not drawn (§4.3).
 
 A `BudgetProfile` holds the window size, the timed window, the warm-up, the PREMISE thresholds and
 eight bars: FRAME mean and p99, GPU mean and p99, CPU mean, HITCH, MEMORY video, MEMORY static. A
-budget of zero skips its bar. Its `device` is a `DeviceProfile`: the DMI board names that identify
-the device, its hardware threads, and the CPU scale with whether that scale is an estimate.
+budget of zero skips its bar. Its `device` is a `DeviceProfile`: the board names that identify the
+device (§3.6), its hardware threads, and the CPU scale with whether that scale is an estimate.
 
 Shipped:
 
@@ -211,13 +211,19 @@ reports into `suite.junit.xml`:
 GODOT=/path/to/godot addons/device_budget/run_suite.sh res://levels/forest.tscn res://levels/town.tscn
 ```
 
-- **On the device or standing in for it.** The board name (`/sys/devices/virtual/dmi/id/product_name`)
-  is matched against `DEVICE_BOARDS` (the Steam Deck's `Jupiter` and `Galileo` by default). On the
-  device the run takes the default GPU and a CPU scale of 1. Anywhere else it takes the first GPU
-  Godot lists as `Integrated` (an integrated GPU is weaker than the Deck's, so a pass there holds on
-  the Deck) and the CPU scale in `HOST_CPU_SCALE` (§5). The GPU comes from `godot --verbose`'s
+- **On the device or standing in for it.** The board name is matched against `DEVICE_BOARDS`, a
+  comma-separated list (the Steam Deck's `Jupiter,Galileo` by default). On the device the run takes
+  the default GPU and a CPU scale of 1. Anywhere else it takes the first GPU Godot lists as
+  `Integrated` (an integrated GPU is weaker than the Deck's, so a pass there holds on the Deck) and the CPU scale in `HOST_CPU_SCALE` (§5). The GPU comes from `godot --verbose`'s
   device list, which is the order `--gpu-index` counts in, probed in a scratch project because the
   list only prints from a windowed run with a main scene. `GPU_INDEX` overrides it.
+- **The board name** is the first of these that names something: the DMI product name
+  (`/sys/devices/virtual/dmi/id/product_name`, any x86 Linux PC, the Deck's `Jupiter`), then the
+  device-tree model (`/proc/device-tree/model`, ARM boards, which have no DMI), else `unknown`.
+  Neither path is device-specific; every Linux kernel exposes whichever its firmware gives. The
+  runner's report (`BudgetReport.board`) reads the same files in the same order, after
+  `OS.get_model_name()`, which Godot fills in only on Windows, macOS and Android; on Linux it
+  answers `GenericDevice` and is skipped.
 - **The monitors must be on** (§4.7). A connected monitor that reads `Off` is woken with
   `kscreen-doctor --dpms on` (or `xset dpms force on`); one that stays off stops the suite.
   The check runs before each scene, because monitors sleep again mid-suite.
@@ -234,8 +240,9 @@ Exit: the number of failing scenes, at most 124; 125 when the suite could not st
 scenes, no integrated GPU, a monitor still off). The script's header lists every variable.
 
 `checks/run_suite_check.sh` proves the script on a fake Godot (`checks/fake_godot.sh`) in seconds,
-with no window: the GPU pick, the board, the monitor check, each way a scene can pass or fail, and
-the merged JUnit. It needs `python3` to parse the XML.
+with no window: the GPU pick, the board and its fallback order, the monitor check, each way a scene can pass or fail, and
+the merged JUnit. It needs `python3` to parse the XML. `checks/board_check.gd` proves the runner's
+side of the board name on fake files.
 
 ### §3.7 — Calibration
 

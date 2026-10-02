@@ -7,7 +7,7 @@ extends Resource
 
 ## Name printed in the report.
 @export var label: String = ""
-## DMI board names (`/sys/devices/virtual/dmi/id/product_name`) that identify the device.
+## Board names that identify the device, as run_suite.sh and BudgetReport.board read them.
 @export var board_names: PackedStringArray = []
 ## Hardware threads the device runs; 0 when unknown.
 @export var hardware_threads: int = 0

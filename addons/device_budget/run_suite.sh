@@ -9,8 +9,8 @@
 #   GODOT           the Godot binary (default `godot` on PATH)
 #   RUNNER          the runner script (default res://addons/device_budget/budget_runner.gd)
 #   PREFIX          the runner's env_prefix (default BUDGET_); the scene goes in <PREFIX>SCENE
-#   DEVICE_BOARDS   board names that mean this host IS the device, space separated (default
-#                   "Jupiter Galileo", the Steam Deck LCD and OLED)
+#   DEVICE_BOARDS   board names that mean this host IS the device, comma separated, since a name
+#                   may hold spaces (default "Jupiter,Galileo", the Steam Deck LCD and OLED)
 #   HOST_CPU_SCALE  <PREFIX>CPU_SCALE when not on the device (default 1); 1 on the device
 #   GPU_INDEX       the --gpu-index to use; unset picks the first Integrated GPU off the device
 #   RESOLUTION      the window (default 1280x800)
@@ -28,7 +28,7 @@ NAME="${NAME:-run_suite}"
 GODOT="${GODOT:-$(command -v godot || true)}"
 RUNNER="${RUNNER:-res://addons/device_budget/budget_runner.gd}"
 PREFIX="${PREFIX:-BUDGET_}"
-DEVICE_BOARDS="${DEVICE_BOARDS:-Jupiter Galileo}"
+DEVICE_BOARDS="${DEVICE_BOARDS:-Jupiter,Galileo}"
 RESOLUTION="${RESOLUTION:-1280x800}"
 TIMEOUT="${TIMEOUT:-300}"
 LOGS="${LOGS:-${TMPDIR:-/tmp}/device_budget}"
@@ -96,9 +96,21 @@ fi
 [ $# -gt 0 ] || die "no scenes; name them as res:// paths"
 mkdir -p "$LOGS" || die "cannot make $LOGS"
 
-board=$(cat /sys/devices/virtual/dmi/id/product_name 2>/dev/null || echo unknown)
+# The board name: the DMI product name on a PC, else the device-tree model on an ARM board, else
+# "unknown". BudgetReport.board reads the same files in the same order.
+board_name() {
+  local file name
+  for file in /sys/devices/virtual/dmi/id/product_name /proc/device-tree/model; do
+    name="$(tr -d '\0' <"$file" 2>/dev/null | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -n "$name" ] && { echo "$name"; return; }
+  done
+  echo unknown
+}
+
+board="$(board_name)"
 on_device=0
-for name in $DEVICE_BOARDS; do
+IFS=, read -r -a device_boards <<<"$DEVICE_BOARDS"
+for name in "${device_boards[@]}"; do
   [ "$board" = "$name" ] && on_device=1
 done
 scale_var="${PREFIX}CPU_SCALE"
