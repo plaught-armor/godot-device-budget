@@ -5,14 +5,14 @@ extends RefCounted
 ## Pure but for `env` and `board`, which read the host. Never instantiated.
 ## WHY: addons/device_budget/README.md §6
 
+## What OS.get_model_name returns on a platform that does not know the model.
+const GENERIC_MODEL: String = "GenericDevice"
 ## Files that name the board, in the order read: the DMI product name on a PC, the device-tree model
 ## on an ARM board. run_suite.sh reads the same two.
-const BOARD_FILES: Array[String] = [
+static var board_files: PackedStringArray = [
 	"/sys/devices/virtual/dmi/id/product_name",
 	"/proc/device-tree/model",
 ]
-## What OS.get_model_name returns on a platform that does not know the model.
-const GENERIC_MODEL: String = "GenericDevice"
 
 
 ## What the run's numbers depend on beyond the scene: engine build, host, GPU, pool, window (px).
@@ -23,7 +23,7 @@ static func env(window: Vector2i) -> Dictionary:
 		"editor": OS.has_feature("editor"),
 		"binary": OS.get_executable_path(),
 		"os": OS.get_name(),
-		"board": board(OS.get_model_name(), BOARD_FILES),
+		"board": board(OS.get_model_name(), board_files),
 		"cpu": OS.get_processor_name(),
 		"threads": OS.get_processor_count(),
 		"pool": ProjectSettings.get_setting("threading/worker_pool/max_threads"),
@@ -40,7 +40,7 @@ static func env(window: Vector2i) -> Dictionary:
 ## The device's board name: `model` unless it is empty or GENERIC_MODEL, else the first of `files`
 ## that exists and holds a name, its trailing NUL and edge whitespace dropped; "" when none does.
 ## Reads `files`.
-static func board(model: String, files: Array[String]) -> String:
+static func board(model: String, files: PackedStringArray) -> String:
 	if not model.is_empty() and model != GENERIC_MODEL:
 		return model
 	for path: String in files:

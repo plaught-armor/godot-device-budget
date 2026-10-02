@@ -21,7 +21,7 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(DIR)
 	var dmi: String = DIR.path_join("product_name")
 	var tree: String = DIR.path_join("model")
-	var files: Array[String] = [dmi, tree]
+	var files: PackedStringArray = [dmi, tree]
 	_write(dmi, "Jupiter\n".to_utf8_buffer())
 	var arm: PackedByteArray = "Raspberry Pi 5 Model B Rev 1.0".to_utf8_buffer()
 	arm.append(0)
