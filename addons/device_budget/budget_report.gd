@@ -29,6 +29,7 @@ static func env(window: Vector2i) -> Dictionary:
 		"gpu_api": RenderingServer.get_video_adapter_api_version(),
 		"audio_device": AudioServer.output_device,
 		"window": [window.x, window.y],
+		"pin": OS.get_environment("DEVICE_BUDGET_PIN"),
 	}
 
 

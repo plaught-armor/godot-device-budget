@@ -358,6 +358,44 @@ It cannot see inside a part: a slow bracket names the node, not the function. A 
 priority 0 land in `p-`, `p0` and `p+`; a bracketed node's stall lands in its column; a null node
 adds no column and leaves no node; the tables print in order; an empty trace says so.
 
+### §3.9 — Pinning the host
+
+A second way to stand in for a device is to make the host more like it, then scale only what is
+left. `pin.sh` runs a command on a few physical cores and their SMT siblings, with those cores'
+clock capped, and reads back what took effect. Linux only.
+
+```sh
+addons/device_budget/pin.sh godot --resolution 1280x800 --path . --script res://...
+PIN=1 addons/device_budget/run_suite.sh res://levels/forest.tscn   # the same, for each scene
+```
+
+- **Cores.** The `PIN_CORES` highest-numbered physical cores (4 by default, like the Deck) and
+  their siblings, from `lscpu`. The script pins itself with `taskset`, so the command and every
+  thread it starts inherit the mask, and reads the effective mask back from `/proc`.
+- **Clock.** Each pinned CPU's own `scaling_max_freq` is set to `PIN_MHZ` (3500 by default; 0 leaves
+  the clock alone), so the rest of the machine keeps its clock. The writes need root: they run under
+  `PIN_SUDO` (`sudo -n` by default, empty when already root). The old values go back when the
+  command ends, however it ends.
+- **The clock is read back, not trusted.** The pinned CPUs are kept busy for `PIN_SPIN` seconds and
+  their clock read from `cpuinfo_avg_freq`. Above the cap by more than 3%, the pin refuses: some
+  drivers accept the write and ignore it.
+- **The state is recorded.** The command sees `DEVICE_BUDGET_PIN`, one line with the effective
+  CPUs, the cap, the busy clock range and the boost flag. `run_suite.sh` prints it on its first
+  line, calibration on its `host` line, and the JSON report carries it under `env.pin`.
+
+Exit: the command's exit code; 125 when the pin could not be set or did not take effect.
+
+**What a pin changes, and what it cannot.** Godot's processor count ignores the mask, so the engine
+still reports every host thread; a worker pool sized from it oversubscribes the pinned cores. Pinning
+moves threaded work, contention and handoffs. Work on one thread runs the same on a pinned core as
+on any other, so for it a pinned and an unpinned run agree by construction. IPC and cache survive
+the pin, so a pinned host still needs a CPU scale, measured by calibration (§3.7) under the same pin.
+
+`checks/pin_check.sh` proves the script on a fake cpu tree, with no root: the cores it picks, the
+mask the command runs under, the cap on the pinned CPUs only and put back after a pass, a failure
+and a refusal, the refusal when the cap cannot be written or does not take, and `PIN=1` through
+`run_suite.sh`.
+
 ## §4 — Measurement rules
 
 A budget measured on a run that did not happen as described prices nothing. Each rule here cost a

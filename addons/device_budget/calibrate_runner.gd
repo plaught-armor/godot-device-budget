@@ -111,7 +111,7 @@ func _say_host() -> void:
 	var gpu_type: int = RenderingServer.get_video_adapter_type()
 	print(
 		(
-			"%s host  cpu=%s threads=%d gpu=%s (%s) engine=%s debug=%s"
+			"%s host  cpu=%s threads=%d gpu=%s (%s) engine=%s debug=%s pin=%s"
 			% [
 				line_prefix,
 				OS.get_processor_name(),
@@ -120,6 +120,7 @@ func _say_host() -> void:
 				types[gpu_type] if gpu_type < types.size() else "unknown",
 				Engine.get_version_info()["string"],
 				OS.is_debug_build(),
+				OS.get_environment("DEVICE_BUDGET_PIN") if OS.has_environment("DEVICE_BUDGET_PIN") else "none",
 			]
 		)
 	)

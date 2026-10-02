@@ -18,6 +18,8 @@
 #   LOGS            where the logs and reports go (default ${TMPDIR:-/tmp}/device_budget)
 #   LINES           an ERE; matching log lines are echoed under each scene (default ^BUDGET )
 #   NAME            the start of this script's own lines (default run_suite)
+#   PIN             1 runs the whole suite under pin.sh: a few cores, their clock capped (Linux,
+#                   root for the cap; PIN_* as pin.sh reads them)
 #
 # Exit: the number of failing scenes, at most 124; 125 when the suite could not start.
 set -u
@@ -84,6 +86,12 @@ xml() {
   echo "${s//\'/&apos;}"
 }
 
+# WHY: addons/device_budget/README.md §3.9
+if [ "${PIN:-0}" = "1" ] && [ -z "${DEVICE_BUDGET_PIN:-}" ]; then
+  NAME="$NAME pin" "$(dirname "$0")/pin.sh" bash "$0" "$@"
+  exit $?
+fi
+
 [ -n "$GODOT" ] && [ -x "$GODOT" ] || die "no Godot binary at '$GODOT'; set GODOT=<path>"
 [ $# -gt 0 ] || die "no scenes; name them as res:// paths"
 mkdir -p "$LOGS" || die "cannot make $LOGS"
@@ -106,7 +114,7 @@ else
   fi
   gpu_args=(--gpu-index "$index")
 fi
-say "board=$board on_device=$on_device cpu_scale=${!scale_var} gpu=${gpu_args[*]:-default}"
+say "board=$board on_device=$on_device cpu_scale=${!scale_var} gpu=${gpu_args[*]:-default} pin=${DEVICE_BUDGET_PIN:-none}"
 export "${PREFIX}REPORT_DIR=$LOGS"
 
 failed=0

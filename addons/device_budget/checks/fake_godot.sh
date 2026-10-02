@@ -9,6 +9,7 @@ for a in "$@"; do
   fi
 done
 echo "args $*" >>"$FAKE_ARGS"
+[ -n "${DEVICE_BUDGET_PIN:-}" ] && echo "pin $DEVICE_BUDGET_PIN allowed $(sed -n 's/^Cpus_allowed_list:\t//p' /proc/self/status)" >>"$FAKE_ARGS"
 dir="$BUDGET_REPORT_DIR"; scene="$(basename "$BUDGET_SCENE" .tscn)"
 pass() { printf '<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="%s" tests="2" failures="%s" skipped="0">\n<testcase name="a"/>\n</testsuite>\n' "$BUDGET_SCENE" "$1" >"$dir/$scene.junit.xml"; }
 echo "BUDGET frame mean 1.0"
