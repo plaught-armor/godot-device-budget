@@ -19,6 +19,8 @@ Valve. The shipped profiles use the name only to say which device their numbers 
 ## §1 — Requirements
 
 - Godot 4.4 or later. Tested on 4.4.1-stable, 4.6-stable and a 4.8 development build.
+- Linux for the shell runners (`run_suite.sh`, `pin.sh`); there is no Windows or macOS runner.
+  The GDScript runners run wherever Godot does.
 - A visible window. The runner prices frames the engine actually drew, so it refuses `--headless`.
   Monitors that are asleep (DPMS off) make the engine skip drawing while the main loop runs on; the
   drawn-frames check (§4.3) catches that.
