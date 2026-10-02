@@ -201,6 +201,41 @@ godot --headless --path . --script res://addons/device_budget/checks/replay_chec
 godot --resolution 1280x800 --path . --script res://addons/device_budget/example/walk_runner.gd
 ```
 
+### §3.6 — Running a suite
+
+`run_suite.sh` runs a runner over several scenes, one windowed process each, and merges their JUnit
+reports into `suite.junit.xml`:
+
+```sh
+GODOT=/path/to/godot addons/device_budget/run_suite.sh res://levels/forest.tscn res://levels/town.tscn
+```
+
+- **On the device or standing in for it.** The board name (`/sys/devices/virtual/dmi/id/product_name`)
+  is matched against `DEVICE_BOARDS` (the Steam Deck's `Jupiter` and `Galileo` by default). On the
+  device the run takes the default GPU and a CPU scale of 1. Anywhere else it takes the first GPU
+  Godot lists as `Integrated` (an integrated GPU is weaker than the Deck's, so a pass there holds on
+  the Deck) and the CPU scale in `HOST_CPU_SCALE` (§5). The GPU comes from `godot --verbose`'s
+  device list, which is the order `--gpu-index` counts in, probed in a scratch project because the
+  list only prints from a windowed run with a main scene. `GPU_INDEX` overrides it.
+- **The monitors must be on** (§4.7). A connected monitor that reads `Off` is woken with
+  `kscreen-doctor --dpms on` (or `xset dpms force on`); one that stays off stops the suite.
+  The check runs before each scene, because monitors sleep again mid-suite.
+- **Each scene is its own process** under `timeout` (`TIMEOUT`, 300 s), so a hung or crashed scene
+  fails alone. Its log and reports go to `LOGS`; the reports from an earlier run are deleted first,
+  so a scene that wrote none cannot pass on stale ones.
+- **The merged JUnit** holds each scene's `<testsuite>`. A scene that wrote no report, or exited
+  non-zero beside a report with no failure, gets a one-case failing suite naming its exit code (or
+  the timeout) and its log.
+- **Output**: `PASS` or `FAIL` per scene, then the log lines matching `LINES` (an ERE, `^BUDGET ` by
+  default) indented beneath it, in log order.
+
+Exit: the number of failing scenes, at most 124; 125 when the suite could not start (no binary, no
+scenes, no integrated GPU, a monitor still off). The script's header lists every variable.
+
+`checks/run_suite_check.sh` proves the script on a fake Godot (`checks/fake_godot.sh`) in seconds,
+with no window: the GPU pick, the board, the monitor check, each way a scene can pass or fail, and
+the merged JUnit. It needs `python3` to parse the XML.
+
 ## §4 — Measurement rules
 
 A budget measured on a run that did not happen as described prices nothing. Each rule here cost a
@@ -271,6 +306,15 @@ in release builds, so there the bar is reported as skipped rather than as 0 MB p
 
 Cap `threading/worker_pool/max_threads` at the device's threads (8 on a Deck) when you price for it.
 A desktop's larger pool hides contention, and Jolt, among others, runs its step on the pool.
+
+### §4.7 — The monitors must be on
+
+With every monitor off (DPMS), Godot reports the window minimized and stops drawing it: the frame
+count stalls while physics runs on, frame and GPU times settle on one value in every scene, and
+rendering stalls appear that a lit screen never shows. §4.3 fails such a run, but only after it has
+run. `run_suite.sh` checks each connected connector's `/sys/class/drm/card*-*/dpms` before each scene
+and wakes the monitors that read `Off`. Monitors can sleep again between runs, so a runner started
+by hand needs the same check.
 
 ## §5 — The CPU scale is an estimate
 
