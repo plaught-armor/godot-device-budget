@@ -14,6 +14,7 @@ extends SceneTree
 #   PROFILE      a BudgetProfile .tres (default `profile`, else steam_deck_60.tres)
 #   RAMP         a stress kind: every window that meets the budget adds RAMP_STEP of it (default 2)
 #   REPORT_DIR   where the JSON and JUnit reports go (default user://device_budget)
+#   TRACE        1 splits every timed physics tick into parts and prints the worst (BudgetTrace)
 ## Exit: 0 on a pass, 1 on any failure, 2 under --headless. A ramp is a measurement: it exits 0
 ## unless a PREMISE fails.
 ## WHY: addons/device_budget/README.md §3.1, §6
@@ -72,6 +73,8 @@ var _windows: Array[Dictionary] = []
 var _checks: Array[Dictionary] = []
 var _printed: PackedStringArray = []
 var _errors: PackedStringArray = []
+# The per-tick trace under <prefix>TRACE=1; null otherwise.
+var _trace: BudgetTrace = null
 
 
 ## Sets the config fields. Called first in _initialize; the base reads only the environment.
@@ -82,6 +85,16 @@ func _configure() -> void:
 ## The stress hook `scene` offers, before it enters the tree; null for none.
 func _find_stress(_scene: Node) -> BudgetStress:
 	return null
+
+
+## The trace's bracket columns in `scene`, by column name, in print order. A null node adds none.
+func _trace_columns(_scene: Node) -> Dictionary[String, Node]:
+	return { }
+
+
+## Words appended to a kept tick's note, after the play phase. Called once per kept tick.
+func _trace_note() -> String:
+	return ""
 
 
 func _initialize() -> void:
@@ -110,7 +123,41 @@ func _initialize() -> void:
 		quit(1)
 		return
 	RenderingServer.viewport_set_measure_render_time(root.get_viewport_rid(), true)
+	if OS.get_environment(env_prefix + "TRACE") == "1":
+		_start_trace(scene)
 	process_frame.connect(_on_process_frame)
+
+
+# Builds the trace: its bands on root, then a bracket per column the subclass names in `scene`.
+func _start_trace(scene: Node) -> void:
+	_trace = BudgetTrace.new(root)
+	var columns: Dictionary[String, Node] = _trace_columns(scene)
+	for column: String in columns:
+		_trace.bracket(column, columns[column])
+
+
+# Opens a trace tick; the engine calls this before any node's physics.
+func _physics_process(_delta: float) -> bool:
+	if _trace != null:
+		var now: int = Time.get_ticks_usec()
+		_close_tick(now)
+		_trace.open(now)
+	return false
+
+
+func _process(_delta: float) -> bool:
+	if _trace != null:
+		_close_tick(Time.get_ticks_usec())
+	return false
+
+
+# Ends the open trace tick at `now` and keeps it when it falls in a timed window.
+func _close_tick(now: int) -> void:
+	var row: PackedFloat64Array = _trace.close(now)
+	if row.is_empty() or _frame <= _window_from:
+		return
+	var phase: String = _phases[-1] if not _phases.is_empty() else "?"
+	_trace.keep(row, phase + _trace_note())
 
 
 # Fills the config the subclass left unset, and the run's settings, from the environment.
@@ -298,6 +345,9 @@ func _report() -> void:
 	else:
 		_say(_ramp_line(window, budget))
 	_say_build()
+	if _trace != null:
+		for line: String in _trace.lines(line_prefix + " trace"):
+			_say(line)
 	_say("%s %s" % [line_prefix, "PASS" if _failures == 0 else "FAIL"])
 	_write_reports(window)
 	quit(1 if _failures > 0 else 0)

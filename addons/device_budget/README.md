@@ -76,6 +76,7 @@ Environment, each name behind `env_prefix` (`BUDGET_` by default):
 | `PROFILE` | a `BudgetProfile` `.tres` | `profile`, else `steam_deck_60.tres` |
 | `RAMP`, `RAMP_STEP` | a stress kind to ramp, and how many to add a step (§3.3) | none, 2 |
 | `REPORT_DIR` | where the JSON and JUnit reports go | `user://device_budget` |
+| `TRACE` | `1` splits every timed physics tick into parts and prints the worst ticks (§3.8) | off |
 
 The runner turns vsync off and sets `Engine.max_fps` to 0 itself. Run it without `--fixed-fps`: a
 pinned clock reports the pin, not the cost (§4.5).
@@ -315,6 +316,47 @@ scale and its range, the spread, each verdict band at and either side of its bou
 (STRONGER under it, weaker and about equal not, weaker at it), and the pick of the largest scale.
 
 Exit: 0 when every workload was measured, 1 on a premise failure, 2 under `--headless`.
+
+### §3.8 — Per-tick trace
+
+The CPU bar reads the worst tick of each second (§4.1), so the question a failing run leaves is
+"which tick, and what was in it". `TRACE=1` answers it without a profiler build. `BudgetTrace` times
+each physics tick from the runner's own `_physics_process`, which the engine calls before any node's,
+and stamps marker nodes along the way: one added last at priorities -100000, -1, 0 and +100000. A
+tick splits into:
+
+| Column | What |
+|---|---|
+| `total` | the whole tick, from the runner's `_physics_process` to its next callback |
+| `pre` | engine work before the first script: interpolation prepare, physics sync, queries |
+| `p-` | scripts below priority 0 |
+| `p0` | scripts at priority 0, which is everything left at the default |
+| `p+` | scripts above priority 0 |
+| `post` | after the last script: navigation, the physics step, the interpolation flush |
+
+A subclass adds a column per node it names, a marker just before the node and one just after it and
+its subtree, at its own priority. The column is a slice of whichever band that priority puts it in.
+A null node adds no column, so a scene without the node runs as is. A note per tick says what the
+game was doing; the runner puts the play phase first.
+
+```gdscript
+func _trace_columns(scene: Node) -> Dictionary[String, Node]:
+	return {"player": scene.find_child("Player", true, false)}
+
+func _trace_note() -> String:
+	return " enemies=%d" % _enemies.size()
+```
+
+Only ticks inside the timed window are kept. The report prints the tick count and the total's
+percentiles, the mean of every column, then the ten worst ticks by total, by each bracket, by `p-`
+and by `post`, each with every column and its note. Times are host milliseconds, not scaled by the
+CPU scale. The markers add work to every tick, so read the verdict from a run without them.
+
+It cannot see inside a part: a slow bracket names the node, not the function. A profiler sees inside.
+
+`checks/trace_check.gd` proves the split headless: nodes that stall a known time below, at and above
+priority 0 land in `p-`, `p0` and `p+`; a bracketed node's stall lands in its column; a null node
+adds no column and leaves no node; the tables print in order; an empty trace says so.
 
 ## §4 — Measurement rules
 
