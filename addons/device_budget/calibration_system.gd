@@ -31,6 +31,10 @@ static var names: PackedStringArray = [
 const GPU_WEAKER_AT: float = 1.1
 ## Ratio below which the stand-in is stronger than the device, so its GPU bars are not evidence.
 const GPU_STRONGER_BELOW: float = 0.9
+## Host GPU milliseconds under which a workload is too little work to call the stand-in weaker or
+## about equal.
+## WHY: addons/device_budget/README.md §3.7
+const GPU_FLOOR_MS: float = 1.0
 ## Spread (largest over smallest scale, less one) past which one CPU scale is not valid.
 const MAX_SPREAD: float = 0.25
 
@@ -76,6 +80,12 @@ static func gpu_verdict(ratio: float) -> String:
 	return (
 		"GPU stand-in STRONGER than the device by x%.2f: GPU bars are not evidence" % (1.0 / ratio)
 	)
+
+
+## Whether a GPU `ratio` from a workload the host drew in `host_ms` can carry its verdict: STRONGER
+## always can; weaker or about equal only from at least GPU_FLOOR_MS of work.
+static func gpu_timed(ratio: float, host_ms: float) -> bool:
+	return ratio < GPU_STRONGER_BELOW or host_ms >= GPU_FLOOR_MS
 
 
 ## The scale with the largest median of `scales` (each from scale()); ZERO when every one is.

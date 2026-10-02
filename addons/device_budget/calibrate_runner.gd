@@ -30,11 +30,11 @@ const SLOTS_2MB: int = 524_288
 const SLOTS_64MB: int = 16_777_216
 const PHYSICS_TICKS: int = 90
 ## W2 pile: boxes a side and layers; characters walking through it.
-const PILE_SIDE: int = 6
-const PILE_LAYERS: int = 6
+const PILE_SIDE: int = 10
+const PILE_LAYERS: int = 8
 const WALKERS: int = 8
 ## W4: separately drawn boxes, and the small viewport they draw into.
-const DRAWS: int = 2000
+const DRAWS: int = 10000
 const DRAW_VIEWPORT: Vector2i = Vector2i(160, 100)
 ## GPU workloads: fragment loop count, vertex loop count, and the plane's subdivisions a side.
 const FILL_LOOPS: int = 1024
@@ -334,16 +334,29 @@ func _say_cpu() -> void:
 # The GPU verdict from the GPU workload that favours the host most.
 func _say_gpu() -> void:
 	var ratio: float = INF
+	var judged: int = -1
 	for w: int in range(
 		CalibrationSystem.Workload.GPU_FILL,
 		CalibrationSystem.Workload.GPU_VERTEX + 1,
 	):
 		var device_ms: float = _device.reference_ms.get(CalibrationSystem.names[w], 0.0)
-		if device_ms > 0.0:
-			ratio = minf(ratio, CalibrationSystem.median(_results[w]) / device_ms)
-	if ratio == INF:
+		if device_ms <= 0.0:
+			continue
+		var each: float = CalibrationSystem.median(_results[w]) / device_ms
+		if each < ratio:
+			ratio = each
+			judged = w
+	if judged < 0:
 		print("%s gpu  no GPU reference in the profile: no verdict" % line_prefix)
 		return
+	var host_ms: float = CalibrationSystem.median(_results[judged])
+	if not CalibrationSystem.gpu_timed(ratio, host_ms):
+		_fail(
+			(
+				"PREMISE %s took %.3f ms here, under the %.1f ms floor: too little work to judge this GPU"
+				% [CalibrationSystem.names[judged], host_ms, CalibrationSystem.GPU_FLOOR_MS]
+			)
+		)
 	var verdict: String = CalibrationSystem.gpu_verdict(ratio).replace("device", _device.label)
 	print("%s gpu  %s" % [line_prefix, verdict])
 
@@ -422,19 +435,22 @@ static func _cycle(slots: int) -> PackedInt32Array:
 	return chase
 
 
-# W2: a floor, a pile of boxes stacked to topple, and walkers circling through it.
+# W2: a floor, a pile of boxes stacked to topple that never sleep, and walkers circling through it.
 func _start_pile() -> void:
 	var pile: Node3D = Node3D.new()
+	var half: float = (PILE_SIDE - 1) * 0.3
 	pile.add_child(_body(StaticBody3D.new(), Vector3(40.0, 1.0, 40.0), Vector3(0.0, -0.5, 0.0)))
 	for layer: int in PILE_LAYERS:
 		for x: int in PILE_SIDE:
 			for z: int in PILE_SIDE:
 				var at: Vector3 = Vector3(
-					x * 0.6 - 1.5 + layer * 0.1,
+					x * 0.6 - half + layer * 0.1,
 					0.3 + layer * 0.6,
-					z * 0.6 - 1.5,
+					z * 0.6 - half,
 				)
-				pile.add_child(_body(RigidBody3D.new(), Vector3(0.5, 0.5, 0.5), at))
+				var box: RigidBody3D = RigidBody3D.new()
+				box.can_sleep = false
+				pile.add_child(_body(box, Vector3(0.5, 0.5, 0.5), at))
 	_walkers.clear()
 	for i: int in WALKERS:
 		var walker: CharacterBody3D = CharacterBody3D.new()
@@ -445,7 +461,7 @@ func _start_pile() -> void:
 		shape.shape = capsule
 		walker.add_child(shape)
 		var angle: float = TAU * i / WALKERS
-		walker.position = Vector3(cos(angle) * 2.5, 0.9, sin(angle) * 2.5)
+		walker.position = Vector3(cos(angle), 0.0, sin(angle)) * (half + 0.9) + Vector3.UP * 0.9
 		pile.add_child(walker)
 		_walkers.append(walker)
 	_stage_node = pile

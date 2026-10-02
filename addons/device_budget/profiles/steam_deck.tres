@@ -13,10 +13,10 @@ reference_ms = Dictionary[String, float]({
 "gpu_fill": 15.378,
 "gpu_vertex": 5.235,
 "w1_script": 226.764,
-"w2_physics": 1.15,
+"w2_physics": 3.203,
 "w3_2mb": 27.126,
 "w3_64mb": 171.956,
-"w4_render_cpu": 1.005
+"w4_render_cpu": 4.964
 })
 reference_estimated = true
 engine_version = "4.8-dev (custom_build)"

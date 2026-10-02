@@ -11,6 +11,7 @@ extends SceneTree
 #   SCALE     median, least and most scale from the host's runs; zero when either side has no time
 #   SPREAD    largest over smallest less one; zero for one value
 #   VERDICT   weaker at and above 1.1, about equal from 0.9 to under 1.1, STRONGER below 0.9
+#   TIMED     STRONGER holds under the GPU floor; weaker and about equal need the floor's work
 #   LARGEST   the entry with the largest median scale, not the largest least or most; zero for none
 ## WHY: addons/device_budget/README.md §3.7
 
@@ -25,6 +26,7 @@ func _initialize() -> void:
 	_check_scale()
 	_check_spread()
 	_check_verdict()
+	_check_timed()
 	_check_largest()
 	print("CALIBRATION %s" % ("PASS" if _failures == 0 else "FAIL"))
 	quit(1 if _failures > 0 else 0)
@@ -57,6 +59,14 @@ func _check_verdict() -> void:
 	_verdict(CalibrationSystem.GPU_STRONGER_BELOW, "about equal")
 	_verdict(0.89, "STRONGER")
 	_check("VERDICT stronger factor", CalibrationSystem.gpu_verdict(0.5).contains("by x2.00"))
+
+
+func _check_timed() -> void:
+	var floor_ms: float = CalibrationSystem.GPU_FLOOR_MS
+	_check("TIMED stronger under floor", CalibrationSystem.gpu_timed(0.5, floor_ms * 0.5))
+	_check("TIMED weaker under floor", not CalibrationSystem.gpu_timed(1.5, floor_ms * 0.5))
+	_check("TIMED equal under floor", not CalibrationSystem.gpu_timed(1.0, floor_ms * 0.5))
+	_check("TIMED weaker at floor", CalibrationSystem.gpu_timed(1.5, floor_ms))
 
 
 func _check_largest() -> void:

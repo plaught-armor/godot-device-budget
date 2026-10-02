@@ -262,8 +262,8 @@ Environment, each name behind `CALIBRATE_`:
 | `w1_script` | 300,000 GDScript iterations of integer and float maths, static and method calls, packed arrays and a typed dictionary | interpreter speed |
 | `w3_2mb` | 1M dependent reads chasing a random cycle through 2 MB | cache latency |
 | `w3_64mb` | the same chase through 64 MB | memory latency |
-| `w2_physics` | one physics tick: a 216-box pile on a floor and 8 characters doing `move_and_slide` through it | physics |
-| `w4_render_cpu` | the render thread's CPU time for 2000 boxes, each with its own material, in a 160×100 viewport | draw-call submission |
+| `w2_physics` | one physics tick: an 800-box pile on a floor, every box kept awake, and 8 characters doing `move_and_slide` through it | physics |
+| `w4_render_cpu` | the render thread's CPU time for 10,000 boxes, each with its own material, in a 160×100 viewport | draw-call submission |
 | `gpu_fill` | a full-window fragment shader looping 1024 times | GPU fill rate |
 | `gpu_vertex` | a 1000×1000-quad plane whose vertex shader loops 64 times | GPU vertex rate |
 
@@ -285,6 +285,15 @@ favourable to this machine:
 - from 0.9 up to 1.1: **about equal**. A pass is marginal evidence.
 - below 0.9: **STRONGER**. GPU bars measured here are not evidence for the device.
 
+**The GPU floor.** A weaker or about-equal verdict needs at least 1 ms of host GPU time
+(`CalibrationSystem.GPU_FLOOR_MS`) behind the judged ratio; under it the runner prints `PREMISE` and
+exits 1. A STRONGER verdict stands at any time. A frame's fixed cost lands in the host time: an
+empty 1-iteration fill pass costs 0.205 ms on the 7700X's iGPU and 0.026 ms on an RX 7900 XTX. That
+cost only inflates host time, so it can make a fast GPU look weaker, never stronger. The floor is
+about five times the iGPU's empty frame. W2 keeps every box awake and W4 draws 10,000 boxes for the
+same reason on the CPU side: at 216 resting boxes and 2000 draws both took about 0.5 ms, close
+enough to the noise that a Deck run could not separate them.
+
 **Premises.** Every windowed workload must draw at least 95% of its frames (§4.3, §4.7), and the GPU
 workloads must run in a 1280×800 window. The window is read from the root's real size;
 `get_visible_rect()` reports the content-scaled size under a stretch mode. A premise failure prints
@@ -302,8 +311,8 @@ with a Radeon iGPU, on a debug build:
   (0.56). The verdicts it gives are as good as that ratio.
 
 `checks/calibration_check.gd` proves the arithmetic (`CalibrationSystem`) headless: the median, the
-scale and its range, the spread, each verdict band at and either side of its boundary, and the pick
-of the largest scale.
+scale and its range, the spread, each verdict band at and either side of its boundary, the GPU floor
+(STRONGER under it, weaker and about equal not, weaker at it), and the pick of the largest scale.
 
 Exit: 0 when every workload was measured, 1 on a premise failure, 2 under `--headless`.
 
