@@ -16,6 +16,12 @@ extends Resource
 @export var cpu_scale: float = 1.0
 ## Whether cpu_scale is an estimate rather than a measurement on the device.
 @export var cpu_scale_estimated: bool = true
+## Milliseconds the device takes for each calibration workload, keyed by its name in
+## CalibrationSystem.names; a workload missing here gets no scale.
+## WHY: addons/device_budget/README.md §3.7
+@export var reference_ms: Dictionary[String, float] = { }
+## Whether reference_ms is an estimate rather than a measurement on the device.
+@export var reference_estimated: bool = true
 ## Engine version and build type the reference numbers were measured on; empty when none were.
 @export var engine_version: String = ""
 @export var build_type: String = ""

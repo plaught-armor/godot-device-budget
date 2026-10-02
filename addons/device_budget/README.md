@@ -236,6 +236,77 @@ scenes, no integrated GPU, a monitor still off). The script's header lists every
 with no window: the GPU pick, the board, the monitor check, each way a scene can pass or fail, and
 the merged JUnit. It needs `python3` to parse the XML.
 
+### §3.7 — Calibration
+
+`calibrate_runner.gd` times a fixed set of small workloads on this machine and compares each one
+with the time the same workload took on the device. Those times are the device profile's
+`reference_ms`. It prints the CPU scale the budget runs should take, and whether this machine's GPU
+is weaker or stronger than the device's:
+
+```sh
+godot --resolution 1280x800 --path . --script res://addons/device_budget/calibrate_runner.gd
+```
+
+Environment, each name behind `CALIBRATE_`:
+
+- `PROFILE`: the `DeviceProfile` holding the device's `reference_ms` (default `profiles/steam_deck.tres`).
+- `SAVE`: a `.tres` path. This machine's medians are written there as a `DeviceProfile`, with
+  `reference_estimated = false` and the engine and build stamped on it. Run this on the device to
+  make its reference.
+- `LABEL`: the saved profile's label (default the CPU name).
+
+**The workloads**, in the order they run:
+
+| Key | What it times | Prices |
+|---|---|---|
+| `w1_script` | 300,000 GDScript iterations of integer and float maths, static and method calls, packed arrays and a typed dictionary | interpreter speed |
+| `w3_2mb` | 1M dependent reads chasing a random cycle through 2 MB | cache latency |
+| `w3_64mb` | the same chase through 64 MB | memory latency |
+| `w2_physics` | one physics tick: a 216-box pile on a floor and 8 characters doing `move_and_slide` through it | physics |
+| `w4_render_cpu` | the render thread's CPU time for 2000 boxes, each with its own material, in a 160×100 viewport | draw-call submission |
+| `gpu_fill` | a full-window fragment shader looping 1024 times | GPU fill rate |
+| `gpu_vertex` | a 1000×1000-quad plane whose vertex shader loops 64 times | GPU vertex rate |
+
+Each workload runs 5 times; the median is the number, and the slowest and fastest runs give the
+range printed beside it. The windowed workloads warm up for 30 frames, then time 60.
+
+**The CPU scale** is device time over this machine's time, per workload. The budget takes the
+largest of W1, W2 and both W3 rows, since the device's weakest point is the one that bites. When
+those scales spread more than 25% apart (largest over smallest, less one), no one number describes
+the CPU: the runner prints the range and holds the top of it. W4 is printed, not used; the render
+thread's cost depends on the driver as much as the CPU.
+
+**The GPU gets a verdict, not a scale.** A desktop GPU differs from the device's in bandwidth, cache
+and clocks in ways one multiplier cannot carry, so the runner only says which way it leans. It takes
+host time over device time for both GPU workloads and judges the smaller ratio, the one most
+favourable to this machine:
+
+- at or above 1.1: **weaker** than the device. A GPU pass here is a pass on the device.
+- from 0.9 up to 1.1: **about equal**. A pass is marginal evidence.
+- below 0.9: **STRONGER**. GPU bars measured here are not evidence for the device.
+
+**Premises.** Every windowed workload must draw at least 95% of its frames (§4.3, §4.7), and the GPU
+workloads must run in a 1280×800 window. The window is read from the root's real size;
+`get_visible_rect()` reports the content-scaled size under a stretch mode. A premise failure prints
+`PREMISE` and exits 1. The runner also warns when the profile's times came from a different engine
+version or build type, since a debug build's GDScript is slower than a release export's.
+
+**The shipped Deck reference is an estimate.** No Deck has been measured yet, so
+`profiles/steam_deck.tres` holds `reference_estimated = true` and times derived from a Ryzen 7 7700X
+with a Radeon iGPU, on a debug build:
+
+- CPU rows: the desktop median × 2.1, the estimate from §5. The CPU scale this prints is therefore
+  §5's estimate read back, not a measurement, until the profile is replaced by a run with
+  `CALIBRATE_SAVE` on a real Deck.
+- GPU rows: the iGPU's median ÷ 2.8, the ratio of the Deck's GPU (1.6 TFLOPS) to that iGPU's
+  (0.56). The verdicts it gives are as good as that ratio.
+
+`checks/calibration_check.gd` proves the arithmetic (`CalibrationSystem`) headless: the median, the
+scale and its range, the spread, each verdict band at and either side of its boundary, and the pick
+of the largest scale.
+
+Exit: 0 when every workload was measured, 1 on a premise failure, 2 under `--headless`.
+
 ## §4 — Measurement rules
 
 A budget measured on a run that did not happen as described prices nothing. Each rule here cost a
