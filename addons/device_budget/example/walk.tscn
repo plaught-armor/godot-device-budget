@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://addons/device_budget/example/example.tscn" id="1_world"]
+[ext_resource type="Script" path="res://addons/device_budget/example/walker.gd" id="2_walker"]
+
+[node name="Walk" type="Node3D"]
+
+[node name="World" parent="." instance=ExtResource("1_world")]
+
+[node name="Walker" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 6)
+script = ExtResource("2_walker")
+
+[node name="Camera" type="Camera3D" parent="Walker"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+current = true

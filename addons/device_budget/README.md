@@ -41,8 +41,9 @@ BUDGET_SCENE=res://levels/forest.tscn godot --resolution 1280x800 --path . \
   --script res://addons/device_budget/example/example_runner.gd
 ```
 
-That needs a `Path3D` and a `Camera3D` in the scene. For anything else, write a runner (§3.1) with a
-driver that plays your scene (§3.2).
+That needs a `Path3D` and a `Camera3D` in the scene. A scene with a player can be played by a
+recorded input track instead (§3.5); `example/walk_runner.gd` replays one. For anything else, write a
+runner (§3.1) with a driver that plays your scene (§3.2).
 
 ## §3 — The pieces
 
@@ -95,7 +96,7 @@ stuck at the spawn point prices an empty room.
 | `activity_lines()` / `activity()` | at the report | lines, and failures held off a ramp: the stress was not engaged |
 | `release()` | when the run ends | — |
 
-Three ship with the addon:
+Four ship with the addon:
 
 - `BudgetDriver` plays nothing and proves nothing. Extend it.
 - `CallbackDriver.new(callable)` calls `callable(t_s, delta_s) -> StringName` each frame and proves
@@ -104,6 +105,8 @@ Three ship with the addon:
   faces along the path, looping at its end. Its premise holds that each timed window covered
   `min_cover` of the path's length (one lap by default), so a window too short for the path fails
   instead of pricing part of the scene. It suits fly-throughs and scenes with no controllable body.
+- `InputReplayDriver` replays a recorded `InputTrack` into the scene's own input handling, and
+  proves a named body moved. It suits a scene with a player. See §3.5.
 
 Drive by wall time (`t_s`, `delta_s`), not by frame count. A frame-counted script plays a shorter,
 lighter run on a slow machine, which is the machine the budget is for.
@@ -141,6 +144,60 @@ hundred fall to 40 fps, the Deck's own fallback refresh, and no lower. GPU mean 
 frame, which leaves room for spikes. The CPU bar is half the frame: game logic runs in the physics
 tick, and a tick over 16.7 ms drops a frame outright. A hitch is a frame longer than two refreshes.
 These are one project's numbers. Copy a profile and change it for yours.
+
+### §3.5 — Recording and replaying input
+
+A scene with a controllable body is best played by the inputs a person gave it. Record them once,
+then replay them on every run:
+
+```sh
+# Play the scene in a window; close it (or wait BUDGET_SECONDS) to save the track.
+BUDGET_SCENE=res://levels/forest.tscn BUDGET_TRACK=res://levels/forest_walk.tres \
+  godot --resolution 1280x800 --path . --script res://addons/device_budget/record_runner.gd
+```
+
+```gdscript
+extends BudgetRunner
+
+func _configure() -> void:
+	scene_path = "res://levels/forest.tscn"
+	var replay: InputReplayDriver = InputReplayDriver.new()
+	replay.track = load("res://levels/forest_walk.tres") as InputTrack
+	replay.body_node = ^"Player"   # the body whose travel proves the play
+	driver = replay
+```
+
+- `InputTrack` is a `Resource`: the track's length, every action change (time, action, strength;
+  strength 0 is a release), and every frame's summed mouse motion.
+- `InputRecorder` polls every action in the `InputMap` once a process frame and keeps a change of at
+  least `STRENGTH_STEP`. A press and release inside one frame shows only as
+  `Input.is_action_just_pressed()`, so it is kept as a press and a release at the same time. Mouse
+  motion arrives as events; feed them to `on_input()` and they are summed per frame.
+- `RecordRunner` is the window that records: it plays `BUDGET_SCENE` and saves to `BUDGET_TRACK`
+  (`res://input_track.tres` by default) after `BUDGET_SECONDS` or when the window closes. It refuses `--headless`, because there is no one to play.
+- `InputReplayDriver` sends the track back through `Input.parse_input_event()`, so `Input.is_action_*`,
+  `Input.get_vector()` and `_unhandled_input()` see what they saw when it was recorded. It keys the
+  track by wall time, so a slow machine replays the same inputs over the same seconds, and loops the
+  track for as long as the run lasts, releasing every held action at the end of each lap. Its premise
+  holds that the timed window replayed input and that `body_node`, when set, moved at least
+  `min_travel_m`; a body that ignored the input, or a track for a different scene, fails.
+
+What a replay does not promise is the same path. Inputs land on the frame after their time, so frame
+pacing shifts each one by up to a frame, and a body that integrates its input drifts a little further
+every lap. For a budget run that is enough: the body covers the same ground, under the same load.
+Mouse motion is recorded as the `relative` your nodes received, so a project whose stretch mode
+scales it scales it the same way on both sides.
+
+`checks/replay_check.gd` proves the round trip on the engine you run, headless. It scripts a walk on
+`example/walk.tscn`, records it, replays the track into a fresh copy of the scene, and holds the
+replayed walker to the recorded one at four moments, within 0.3 m and 0.05 rad. It also checks that
+no action is left held. `example/walk_track.tres` is the track it records (`REPLAY_TRACK` names a path
+to save it to), and `example/walk_runner.gd` replays it under the budget:
+
+```sh
+godot --headless --path . --script res://addons/device_budget/checks/replay_check.gd
+godot --resolution 1280x800 --path . --script res://addons/device_budget/example/walk_runner.gd
+```
 
 ## §4 — Measurement rules
 

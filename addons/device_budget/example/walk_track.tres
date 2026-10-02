@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="InputTrack" format=3]
+
+[ext_resource type="Script" path="res://addons/device_budget/input_track.gd" id="1_qjs57"]
+
+[resource]
+script = ExtResource("1_qjs57")
+length_s = 6.003123
+action_times_s = PackedFloat32Array(0.207144, 2.008164, 3.008585, 3.008585, 5.00958, 5.00958, 5.513228, 5.513228)
+action_names = PackedStringArray("ui_up", "ui_up", "ui_right", "ui_up", "ui_right", "ui_up", "ui_left", "ui_left")
+action_strengths = PackedFloat32Array(1, 0, 1, 1, 0, 0, 1, 0)
+motion_times_s = PackedFloat32Array(2.008164, 2.014891, 2.021834, 2.028714, 2.035608, 2.042535, 2.049415, 2.056344, 2.063242, 2.070179, 2.077023, 2.083887, 2.090852, 2.097725, 2.10469, 2.111534, 2.118428, 2.125361, 2.132215, 2.139152, 2.145997, 2.152885, 2.159842, 2.166713, 2.173629, 2.180515, 2.187422, 2.194314, 2.201224, 2.208154)
+motion_relative = PackedVector2Array(10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0)
