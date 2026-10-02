@@ -174,7 +174,9 @@ func _configure() -> void:
   `Input.is_action_just_pressed()`, so it is kept as a press and a release at the same time. Mouse
   motion arrives as events; feed them to `on_input()` and they are summed per frame.
 - `RecordRunner` is the window that records: it plays `BUDGET_SCENE` and saves to `BUDGET_TRACK`
-  (`res://input_track.tres` by default) after `BUDGET_SECONDS` or when the window closes. It refuses `--headless`, because there is no one to play.
+  (`res://input_track.tres` by default) after `BUDGET_SECONDS` or when the window closes. It refuses `--headless`, because there is no one to play,
+  and it writes nothing (exit 1) when the window closed with no input recorded, so a run nobody played
+  cannot leave an empty track for a replay to fail on.
 - `InputReplayDriver` sends the track back through `Input.parse_input_event()`, so `Input.is_action_*`,
   `Input.get_vector()` and `_unhandled_input()` see what they saw when it was recorded. It keys the
   track by wall time, so a slow machine replays the same inputs over the same seconds, and loops the

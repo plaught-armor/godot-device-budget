@@ -11,7 +11,7 @@ extends SceneTree
 #   SCENE    the scene to play (default `scene_path`)
 #   TRACK    where the track is saved (default `track_path`)
 #   SECONDS  stop after this many seconds (default: when the window closes)
-## Exit: 0 when the track was saved, 1 when it was not, 2 under --headless.
+## Exit: 0 when the track was saved, 1 when it was not (or held no input), 2 under --headless.
 ## WHY: addons/device_budget/README.md §3.5
 
 ## Config, set in _configure() or from the environment.
@@ -76,6 +76,9 @@ func _finalize() -> void:
 # Writes the track to track_path; false, with an error printed, when it could not.
 func _save() -> bool:
 	_saved = true
+	if recorder.track.action_times_s.is_empty() and recorder.track.motion_times_s.is_empty():
+		push_error("%s: no input was recorded; %s not written" % [error_prefix, track_path])
+		return false
 	var err: Error = ResourceSaver.save(recorder.track, track_path)
 	if err != OK:
 		push_error("%s: saving %s failed: %s" % [error_prefix, track_path, error_string(err)])
